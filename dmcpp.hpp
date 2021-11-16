@@ -9,6 +9,8 @@
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 #include <boost/numeric/ublas/io.hpp>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 
 void creator(boost::numeric::ublas::vector<int> &phi, int p);
 void annihilator(boost::numeric::ublas::vector<int> &phi, int p);
@@ -19,8 +21,19 @@ double trace_2b(boost::numeric::ublas::vector<double> data);
 
 std::string state2occupation(std::string state);
 boost::numeric::ublas::matrix<int> gen_basis(int nholes, int nparticles);
-boost::numeric::ublas::vector<double> density_1b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights);
-boost::numeric::ublas::vector<double> density_2b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights);
-boost::numeric::ublas::vector<double> density_3b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights);
+boost::numeric::ublas::matrix<int> readBasisFromFile(std::string file_path);
+
+boost::numeric::ublas::vector<double> density_1b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, std::string basis_path);
+boost::numeric::ublas::vector<double> density_2b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, std::string basis_path);
+boost::numeric::ublas::vector<double> density_3b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, std::string basis_path);
+
+inline bool fexists (const std::string& name) {
+    if (FILE *file = fopen(name.c_str(), "r")) {
+        fclose(file);
+        return true;
+    } else {
+        return false;
+    } 
+}
 
 #endif

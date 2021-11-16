@@ -6,7 +6,6 @@
 //     Author: Jacob Davison                                            //
 //     Date: 08/05/2021                                                 //
 //////////////////////////////////////////////////////////////////////////
-
 #include "dmcpp.hpp"
 
 using namespace boost::numeric::ublas;
@@ -118,7 +117,9 @@ std::string state2occupation(std::string state) {
 
 
 /*
-  Generate only Sz = 0 block.
+  Generate only Sz = 0 block. Run through permuations of
+  occupation string. Ordering ends up not intuitive; not sure
+  how to fix this yet.
  */
 matrix<int> gen_basis(int nholes, int nparticles) {
 
@@ -161,13 +162,83 @@ matrix<int> gen_basis(int nholes, int nparticles) {
     return basis;
 }
 
-vector<double> density_1b(int nholes, int nparticles, vector<double> weights) {
+/*
+  Read SD basis from a file. The first line is assumed to be
+      <# s.p. states> <# states>
+  which gives the columns and rows for the matrix<int> that will
+  be returned as the basis.
+ */
+matrix<int> readBasisFromFile(std::string file_path) {
+    std::string line;
+    std::ifstream myfile (file_path);
+    
+    int num_sp, num_states, count;
 
+    if (myfile.is_open()) {
+        getline(myfile,line);
+        size_t pos = 0;
+        std::string delim = " ";
+        std::string token;
+        
+
+        pos = line.find(delim);
+        token = line.substr(0, pos);
+        line.erase(0, pos + delim.length());
+        
+        num_sp = std::stoi(token);
+        num_states = std::stoi(line);
+    }
+
+    std::cout << num_sp << " " << num_states << std::endl;
+
+    matrix<int> M(num_states, num_sp+1);
+    count = 0;
+    if (myfile.is_open()) {            
+            while ( getline (myfile,line) )
+                {
+                    for (int i = 0; i < num_sp; i++) {
+                        const char& s = line[i];
+                        M(count,i) = (s-'0');
+                    }
+                    count++;
+                        
+                }
+            myfile.close();
+        }
+
+    else std::cout << "Unable to open file"; 
+
+    return M;
+}
+
+
+/*
+  Build density matrix from gen_basis() function. Ordering is not logical.
+ */
+vector<double> density_1b(int nholes, int nparticles, vector<double> weights, std::string basis_path = "") {
+    matrix<int> basis;
+    std::string def = "";
     int numSP = nholes+nparticles;
-    matrix<int> basis = gen_basis(nholes, nparticles);
+    
+    if (basis_path == def) {
+        basis = gen_basis(nholes, nparticles);
+    }
+    else if (fexists(basis_path)) {
+        basis = readBasisFromFile(basis_path);
+    }
+    else {
+        std::cout << "ARGS MALFORMED OR FILE DOES NOT EXIST\n";
+        exit(1);
+    }
+
+    std::cout << basis << std::endl;
+
     int numBasisStates = basis.size1();
 
     vector<double> rho1b(numSP*numSP);
+    for (int i = 0; i < rho1b.size(); i++)
+        rho1b(i) = 0.0;
+
     vector<int> state_bra, state_ket;
     double coeff_bra, coeff_ket;
 
@@ -199,13 +270,33 @@ vector<double> density_1b(int nholes, int nparticles, vector<double> weights) {
 
 }
 
-vector<double> density_2b(int nholes, int nparticles, vector<double> weights) {
 
+/*
+  Build density matrix from gen_basis(). Ordering is not logical.
+ */
+vector<double> density_2b(int nholes, int nparticles, vector<double> weights, std::string basis_path = "") {
+
+    matrix<int> basis;
+    std::string def = "";
     int numSP = nholes+nparticles;
-    matrix<int> basis = gen_basis(nholes, nparticles);
+    
+    if (basis_path == def) {
+        basis = gen_basis(nholes, nparticles);
+    }
+    else if (fexists(basis_path)) {
+        basis = readBasisFromFile(basis_path);
+    }
+    else {
+        std::cout << "ARGS MALFORMED OR FILE DOES NOT EXIST\n";
+        exit(1);
+    }
+
     int numBasisStates = basis.size1();
 
     vector<double> rho2b(numSP*numSP*numSP*numSP);
+    for (int i = 0; i < rho2b.size(); i++)
+        rho2b[i] = 0.0;
+
     vector<int> state_bra, state_ket;
     double coeff_bra, coeff_ket, result;
     
@@ -268,19 +359,33 @@ double trace_2b(vector<double> data) {
 // int main(int argc, char** argv) {
 //     int nholes = std::atoi(argv[1]);
 //     int nparticles = std::atoi(argv[2]);
+//     std::string basis_path = "";
 
-//     matrix<int> m;
-//     m = gen_basis(nholes, nparticles);
-//     std::cout << m << std::endl;
+//     if (argc > 3)
+//         basis_path = argv[3];
+                  
 //     vector<double> weights(36);
 //     for(int i = 0; i < 36; i++) {
 //         weights[i] = 0.0;
-//         if (i == 35)
-//             weights[i] = 1.0;
+//         if (i == 0)
+//             weights[i] = sqrt(0.8);
+//         if (i == 1)
+//             weights[i] = sqrt(0.2);
 //     }
         
-//     vector<double> rho1b = density_1b(nholes, nparticles, weights);
-//     vector<double> rho2b = density_2b(nholes, nparticles, weights);
+//     vector<double> rho1b = density_1b(nholes, nparticles, weights, basis_path);
+//     vector<double> rho2b = density_2b(nholes, nparticles, weights, basis_path);
+//     std::cout << rho1b << std::endl;
+//     int idx;
+//     for (int i = 0; i < 8; i++) {
+//         for (int j = 0; j < 8; j++) {
+//             idx = i*8 + j;
+//             printf("%0.2f  ", rho1b[idx]);
+//         }
+//         std::cout << "\n";
+//     }
+
+        
     
 //     double trace1b = trace_1b(rho1b);
 //     double trace2b = trace_2b(rho2b);
