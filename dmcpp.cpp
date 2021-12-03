@@ -6,6 +6,8 @@
 //     Author: Jacob Davison                                            //
 //     Date: 08/05/2021                                                 //
 //////////////////////////////////////////////////////////////////////////
+#include <iostream>
+#include <fstream>
 #include "dmcpp.hpp"
 
 using namespace boost::numeric::ublas;
@@ -189,16 +191,14 @@ matrix<int> readBasisFromFile(std::string file_path) {
         num_states = std::stoi(line);
     }
 
-    std::cout << num_sp << " " << num_states << std::endl;
-
     matrix<int> M(num_states, num_sp+1);
     count = 0;
     if (myfile.is_open()) {            
             while ( getline (myfile,line) )
                 {
-                    for (int i = 0; i < num_sp; i++) {
+                    for (int i = 0; i < num_sp+1; i++) {
                         const char& s = line[i];
-                        M(count,i) = (s-'0');
+                        M(count,i) = s-'0';
                     }
                     count++;
                         
@@ -230,8 +230,6 @@ vector<double> density_1b(int nholes, int nparticles, vector<double> weights, st
         std::cout << "ARGS MALFORMED OR FILE DOES NOT EXIST\n";
         exit(1);
     }
-
-    std::cout << basis << std::endl;
 
     int numBasisStates = basis.size1();
 
@@ -322,9 +320,9 @@ vector<double> density_2b(int nholes, int nparticles, vector<double> weights, st
                             result = coeff_bra*coeff_ket*inner_product(state_bra, state_ket);
 
                             rho2b[p*numSP*numSP*numSP + q*numSP*numSP + r*numSP + s] += result;
-                            rho2b[q*numSP*numSP*numSP + p*numSP*numSP + r*numSP + s] = -result;
-                            rho2b[p*numSP*numSP*numSP + q*numSP*numSP + s*numSP + r] = -result;
-                            rho2b[q*numSP*numSP*numSP + p*numSP*numSP + s*numSP + r] = result;
+                            rho2b[q*numSP*numSP*numSP + p*numSP*numSP + r*numSP + s] += -result;
+                            rho2b[p*numSP*numSP*numSP + q*numSP*numSP + s*numSP + r] += -result;
+                            rho2b[q*numSP*numSP*numSP + p*numSP*numSP + s*numSP + r] += result;
 
                             // if ( !(std::abs(result) < 1e-16) )
                             //     std::cout << result << state_bra << " " << state_ket << std::endl;
@@ -367,6 +365,8 @@ double trace_2b(vector<double> data) {
 //     vector<double> weights(36);
 //     for(int i = 0; i < 36; i++) {
 //         weights[i] = 0.0;
+//         // if (i == 0)
+//         //     weights[i] = 1.0;
 //         if (i == 0)
 //             weights[i] = sqrt(0.8);
 //         if (i == 1)
@@ -384,7 +384,29 @@ double trace_2b(vector<double> data) {
 //         }
 //         std::cout << "\n";
 //     }
+    
+//     std::ofstream out_file_1("rho1b.txt");
+//     if (out_file_1.is_open()) {
+//         for (int i = 0; i < rho1b.size(); i++) {
+//             double x = rho1b[i];
 
+//             out_file_1 << x << "\n";
+
+//         }
+//         out_file_1.close();
+//     }
+
+//     std::ofstream out_file_2("rho2b.txt");
+//     if (out_file_2.is_open()) {
+//         for (int i = 0; i < rho2b.size(); i++) {
+//             double x = rho2b[i];
+
+//             out_file_2 << x << "\n";
+
+//         }
+//         out_file_2.close();
+//     }
+    
         
     
 //     double trace1b = trace_1b(rho1b);
