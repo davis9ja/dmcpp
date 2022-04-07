@@ -6,8 +6,11 @@ project(dmc)
 
 set(PROJECT_DIR .)
 
-add_library(dmc dmcpp.cpp)
+find_package(OpenMP REQUIRED)
 
+add_library(dmc dmcpp.cpp)
 target_include_directories(dmc PUBLIC ${PROJECT_DIR})
 
 #add_executable(debug dmcpp.cpp)
+
+#target_link_libraries(debug OpenMP::OpenMP_CXX)

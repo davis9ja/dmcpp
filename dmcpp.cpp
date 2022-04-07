@@ -8,6 +8,9 @@
 //////////////////////////////////////////////////////////////////////////
 #include <iostream>
 #include <fstream>
+#include <omp.h>
+#include <chrono>
+
 #include "dmcpp.hpp"
 
 using namespace boost::numeric::ublas;
@@ -215,7 +218,8 @@ matrix<int> readBasisFromFile(std::string file_path) {
 /*
   Build density matrix from gen_basis() function. Ordering is not logical.
  */
-vector<double> density_1b(int nholes, int nparticles, vector<double> weights, std::string basis_path = "") {
+vector<double> density_1b(int nholes, int nparticles, vector<double> weights, int omp_nthreads, std::string basis_path = "") {
+    
     matrix<int> basis;
     std::string def = "";
     int numSP = nholes+nparticles;
@@ -239,28 +243,41 @@ vector<double> density_1b(int nholes, int nparticles, vector<double> weights, st
 
     vector<int> state_bra, state_ket;
     double coeff_bra, coeff_ket;
+    double rho1b_pq;
 
     int p,q,i,j;
 
+
+
     for (p = 0; p < numSP; p++) {
         for (q = 0; q < numSP; q++) {
+
+            rho1b_pq = 0.0;
+
+#pragma omp parallel for collapse(2) num_threads(omp_nthreads) reduction(+:rho1b_pq) shared(basis, weights) private(state_ket, coeff_ket, state_bra, coeff_bra, i,j)              
+
             for (i = 0; i < numBasisStates; i++) {
-                state_ket = matrix_row<matrix<int>>(basis, i);
-                coeff_ket = weights[i];
-                annihilator(state_ket, q);
-                creator(state_ket, p);
+
                 //std::cout << state_ket << std::endl;
                 
                 for (j = 0; j < numBasisStates; j++) {
+                    state_ket = matrix_row<matrix<int>>(basis, i);
+                    coeff_ket = weights[i];
+                    annihilator(state_ket, q);
+                    creator(state_ket, p);
+
                     state_bra = matrix_row<matrix<int>>(basis, j);
                     coeff_bra = weights[j];
 
-                    rho1b[p*numSP + q] += coeff_bra*coeff_ket*inner_product(state_bra, state_ket);
+                    rho1b_pq += coeff_bra*coeff_ket*inner_product(state_bra, state_ket);
 
                     // if ( !(std::abs(rho1b[p*numSP + q]) < 1e-16) )
                     //     std::cout << rho1b[p*numSP + q] << state_bra << " " << state_ket << std::endl;
                 }
             }
+
+            rho1b[p*numSP + q] += rho1b_pq;
+            //std::cout << "done 1b " << p*numSP+q << " " << rho1b_pq << std::endl;
         }
     }
     
@@ -272,7 +289,7 @@ vector<double> density_1b(int nholes, int nparticles, vector<double> weights, st
 /*
   Build density matrix from gen_basis(). Ordering is not logical.
  */
-vector<double> density_2b(int nholes, int nparticles, vector<double> weights, std::string basis_path = "") {
+vector<double> density_2b(int nholes, int nparticles, vector<double> weights, int omp_nthreads, std::string basis_path = "") {
 
     matrix<int> basis;
     std::string def = "";
@@ -297,37 +314,46 @@ vector<double> density_2b(int nholes, int nparticles, vector<double> weights, st
 
     vector<int> state_bra, state_ket;
     double coeff_bra, coeff_ket, result;
-    
+    double rho2b_pqrs;
+
     int p,q,r,s,i,j;
 
     for (q = 0; q < numSP; q++) {
         for (p = 0; p < q; p++) {
             for (s = 0; s < numSP; s++) {
                 for (r = 0; r < s; r++) {
-                    for (i = 0; i < numBasisStates; i++) {
-                        state_ket = matrix_row<matrix<int>>(basis, i);
-                        coeff_ket = weights[i];
-                        
-                        annihilator(state_ket, r);
-                        annihilator(state_ket, s);
-                        creator(state_ket, q);
-                        creator(state_ket, p);
+                    rho2b_pqrs = 0.0;
 
-                
+#pragma omp parallel for collapse(2) num_threads(omp_nthreads) reduction(+:rho2b_pqrs) shared(weights, basis) private(state_ket, coeff_ket, state_bra, coeff_bra, i,j)
+                    for (i = 0; i < numBasisStates; i++) {                
                         for (j = 0; j < numBasisStates; j++) {
+                            state_ket = matrix_row<matrix<int>>(basis, i);
+                            coeff_ket = weights[i];
+                        
+                            annihilator(state_ket, r);
+                            annihilator(state_ket, s);
+                            creator(state_ket, q);
+                            creator(state_ket, p);
+
+
+
                             state_bra = matrix_row<matrix<int>>(basis, j);
                             coeff_bra = weights[j];
-                            result = coeff_bra*coeff_ket*inner_product(state_bra, state_ket);
+                            //result = coeff_bra*coeff_ket*inner_product(state_bra, state_ket);
 
-                            rho2b[p*numSP*numSP*numSP + q*numSP*numSP + r*numSP + s] += result;
-                            rho2b[q*numSP*numSP*numSP + p*numSP*numSP + r*numSP + s] += -result;
-                            rho2b[p*numSP*numSP*numSP + q*numSP*numSP + s*numSP + r] += -result;
-                            rho2b[q*numSP*numSP*numSP + p*numSP*numSP + s*numSP + r] += result;
+                            rho2b_pqrs += coeff_bra*coeff_ket*inner_product(state_bra, state_ket);
 
                             // if ( !(std::abs(result) < 1e-16) )
                             //     std::cout << result << state_bra << " " << state_ket << std::endl;
                         }
                     }
+
+                    rho2b[p*numSP*numSP*numSP + q*numSP*numSP + r*numSP + s] += rho2b_pqrs;
+                    rho2b[q*numSP*numSP*numSP + p*numSP*numSP + r*numSP + s] += -rho2b_pqrs;
+                    rho2b[p*numSP*numSP*numSP + q*numSP*numSP + s*numSP + r] += -rho2b_pqrs;
+                    rho2b[q*numSP*numSP*numSP + p*numSP*numSP + s*numSP + r] += rho2b_pqrs;
+                
+                    //std::cout << "done 2b " << p*numSP*numSP*numSP + q*numSP*numSP + r*numSP + s << " " << rho2b_pqrs << std::endl;
                 }
             }
         }
@@ -357,33 +383,53 @@ double trace_2b(vector<double> data) {
 // int main(int argc, char** argv) {
 //     int nholes = std::atoi(argv[1]);
 //     int nparticles = std::atoi(argv[2]);
+//     int omp_nthreads = std::atoi(argv[3]);
+
 //     std::string basis_path = "";
 
-//     if (argc > 3)
-//         basis_path = argv[3];
-                  
-//     vector<double> weights(36);
-//     for(int i = 0; i < 36; i++) {
+//     if (argc > 4)
+//         basis_path = argv[4];
+
+
+//     matrix<int> basis = readBasisFromFile(basis_path);
+//     int basis_length = basis.size1();
+
+//     std::cout << "got basis from file " << std::endl;
+
+//     vector<double> weights(400);
+//     for(int i = 0; i < basis_length; i++) {
 //         weights[i] = 0.0;
-//         // if (i == 0)
-//         //     weights[i] = 1.0;
 //         if (i == 0)
-//             weights[i] = sqrt(0.8);
-//         if (i == 1)
-//             weights[i] = sqrt(0.2);
+//             weights[i] = 1.0;
+//         // if (i == 0)
+//         //     weights[i] = sqrt(0.8);
+//         // if (i == 1)
+//         //     weights[i] = sqrt(0.2);
 //     }
-        
-//     vector<double> rho1b = density_1b(nholes, nparticles, weights, basis_path);
-//     vector<double> rho2b = density_2b(nholes, nparticles, weights, basis_path);
+
+//     std::cout << "START 1B" << std::endl;
+//     auto start = std::chrono::high_resolution_clock::now();
+//     vector<double> rho1b = density_1b(nholes, nparticles, weights,  omp_nthreads, basis_path);
+//     auto stop = std::chrono::high_resolution_clock::now();
+//     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+//     std::cout << "\nDone " << duration.count()/1e6 << " seconds" << std::endl;
+
+//     std::cout << "START 2B" << std::endl;
+//     start = std::chrono::high_resolution_clock::now();
+//     vector<double> rho2b = density_2b(nholes, nparticles, weights,  omp_nthreads, basis_path);
+//     stop = std::chrono::high_resolution_clock::now();
+//     duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+//     std::cout << "\nDone " << duration.count()/1e6 << " seconds" << std::endl;
+
 //     std::cout << rho1b << std::endl;
-//     int idx;
-//     for (int i = 0; i < 8; i++) {
-//         for (int j = 0; j < 8; j++) {
-//             idx = i*8 + j;
-//             printf("%0.2f  ", rho1b[idx]);
-//         }
-//         std::cout << "\n";
-//     }
+//     // int idx;
+//     // for (int i = 0; i < 8; i++) {
+//     //     for (int j = 0; j < 8; j++) {
+//     //         idx = i*8 + j;
+//     //         printf("%0.2f  ", rho1b[idx]);
+//     //     }
+//     //     std::cout << "\n";
+//     // }
     
 //     std::ofstream out_file_1("rho1b.txt");
 //     if (out_file_1.is_open()) {
@@ -411,5 +457,6 @@ double trace_2b(vector<double> data) {
     
 //     double trace1b = trace_1b(rho1b);
 //     double trace2b = trace_2b(rho2b);
+//     std::cout << trace1b << std::endl;
 //     std::cout << trace2b << std::endl;
 // }

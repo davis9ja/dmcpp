@@ -23,9 +23,9 @@ std::string state2occupation(std::string state);
 boost::numeric::ublas::matrix<int> gen_basis(int nholes, int nparticles);
 boost::numeric::ublas::matrix<int> readBasisFromFile(std::string file_path);
 
-boost::numeric::ublas::vector<double> density_1b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, std::string basis_path);
-boost::numeric::ublas::vector<double> density_2b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, std::string basis_path);
-boost::numeric::ublas::vector<double> density_3b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, std::string basis_path);
+boost::numeric::ublas::vector<double> density_1b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, int omp_nthreads, std::string basis_path);
+boost::numeric::ublas::vector<double> density_2b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, int omp_nthreads, std::string basis_path);
+boost::numeric::ublas::vector<double> density_3b(int nholes, int nparticles, boost::numeric::ublas::vector<double> weights, int omp_nthreads, std::string basis_path);
 
 inline bool fexists (const std::string& name) {
     if (FILE *file = fopen(name.c_str(), "r")) {
